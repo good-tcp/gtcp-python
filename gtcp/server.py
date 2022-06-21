@@ -3,25 +3,24 @@ from Crypto.Cipher import PKCS1_OAEP
 from uuid import uuid4
 from threading import Thread
 import socket
-import json
-from base64 import b64encode, b64decode
-import struct
+import netstruct
 
 class partialserver:
     def __init__(self, base,includesockets=[]):
         self.__sockets = {i: base._server__sockets[i] for i in base._server__sockets}
         self.__include = [includesockets]
-    def emit(self, event, *data):
+    def emit(self, *data):
+        types = b""
+        mdata = []
+        for i in data:
+            dtype = type(i)
+            if not dtype in [str, float, int]:
+                raise Exception(f"Emit data type unsupported. {dtype}")
+            types += b"b$" if dtype == str else b"i" if dtype == int else b"f"
+            mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+        encodeddata = netstruct.pack(b'b$b$', types, netstruct.pack(types, *mdata))
         for socket in [i for i in self.__sockets if any([u in self.__include for u in self.__sockets[i]["rooms"]])]:
-            encrypteddata = [event, []]
-            for i in data:
-                dtype = type(i)
-                if not dtype in [str, float, int]:
-                    raise Exception(f"Emit data type unsupported. {dtype}")
-                bytev = bytearray(i, 'utf-8') if dtype == str else struct('i' if dtype == int else 'f', i)
-                encrypted = [dtype.__name__, b64encode(self.__sockets[socket]["crypto"]["client"][1].encrypt(bytev)).decode()]
-                encrypteddata[1].append(encrypted)
-            self.__sockets[socket]["clientconn"][0].sendall(bytearray(json.dumps(encrypteddata), 'utf-8'))
+            self.__sockets[socket]["clientconn"][0].sendall(self.__sockets[socket]["crypto"]["client"][1].encrypt(encodeddata))
     def to(self, room):
         self.__include.append(room)
         return self
@@ -42,16 +41,17 @@ class server:
                 self.__crypto = crypto
                 self.__conn = connection
                 self.__ehandler = {}
-            def emit(self, event, *data):
-                encrypteddata = [event, []]
+            def emit(self, *data):
+                types = b""
+                mdata = []
                 for i in data:
                     dtype = type(i)
                     if not dtype in [str, float, int]:
                         raise Exception(f"Emit data type unsupported. {dtype}")
-                    bytev = bytearray(i, 'utf-8') if dtype == str else struct('i' if dtype == int else 'f', i)
-                    encrypted = [dtype.__name__, b64encode(self.__crypto["client"][1].encrypt(bytev)).decode()]
-                    encrypteddata[1].append(encrypted)
-                self.__conn[0].sendall(bytearray(json.dumps(encrypteddata), 'utf-8'))
+                    types += b"b$" if dtype == str else b"i" if dtype == int else b"f"
+                    mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+                encodeddata = netstruct.pack(b'b$b$', types, netstruct.pack(types, *mdata))
+                self.__conn[0].sendall(self.__crypto["client"][1].encrypt(encodeddata))
             def on(self, event, callback):
                 self.__ehandler[event] = callback
             def join(self, room):
@@ -75,7 +75,6 @@ class server:
                     connection.sendall(key.publickey().exportKey(format='PEM', passphrase=None, pkcs=1))
                     while True:
                         data = connection.recv(1024)
-                        print(data, self.__sockets[socketid]["crypto"]["client"], self.__sockets.keys())
                         if not self.__sockets[socketid]["crypto"]["client"]:
                             clientkey = RSA.importKey(data, passphrase=None)
                             clientencryptor = PKCS1_OAEP.new(clientkey)
@@ -84,26 +83,29 @@ class server:
                             callback(vsocket)
                         else:
                             try:
-                                datalist = [json.loads(str(data, 'utf-8'))[0], [str(self.__sockets[socketid]["crypto"]["server"][1].decrypt(b64decode(i[1])), 'utf-8') if i[0] == "str" else struct.unpack('i' if i[0] == 'int' else 'f', self.__sockets[socketid]["crypto"]["server"][1].decrypt(b64decode(i[1]))) for i in json.loads(str(data, 'utf-8'))[1]]]
+                                decrypted = self.__sockets[socketid]["crypto"]["server"][1].decrypt(data)
+                                datalist = netstruct.unpack(*netstruct.unpack(b"b$b$", decrypted))
                             except Exception:
                                 raise Exception
                             else:
-                                if datalist[0] in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler[datalist[0]](*datalist[1])
+                                datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
+                                if datalist[0] in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
                 t1 = Thread(target=conngetdata)
                 t1.start()
         t = Thread(target=startcon)
         t.start()
-    def emit(self, event, *data):
+    def emit(self, *data):
+        types = b""
+        mdata = []
+        for i in data:
+            dtype = type(i)
+            if not dtype in [str, float, int]:
+                raise Exception(f"Emit data type unsupported. {dtype}")
+            types += b"b$" if dtype == str else b"i" if dtype == int else b"f"
+            mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+        encodeddata = netstruct.pack(b'b$b$', types, netstruct.pack(types, *mdata))
         for socket in self.__sockets:
-            encrypteddata = [event, []]
-            for i in data:
-                dtype = type(i)
-                if not dtype in [str, float, int]:
-                    raise Exception(f"Emit data type unsupported. {dtype}")
-                bytev = bytearray(i, 'utf-8') if dtype == str else struct('i' if dtype == int else 'f', i)
-                encrypted = [dtype.__name__, b64encode(self.__sockets[socket]["crypto"]["client"][1].encrypt(bytev)).decode()]
-                encrypteddata[1].append(encrypted)
-            self.__sockets[socket]["clientconn"][0].sendall(bytearray(json.dumps(encrypteddata), 'utf-8'))
+            self.__sockets[socket]["clientconn"][0].sendall(self.__sockets[socket]["crypto"]["client"][1].encrypt(encodeddata))
     def to(self, room):
         modifieds = partialserver(self, includesockets=room)
         return modifieds

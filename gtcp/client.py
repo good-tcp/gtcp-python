@@ -2,9 +2,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import socket
 from threading import Thread
-import json
-from base64 import b64encode, b64decode
-import struct
+import netstruct
 
 class client:
     def __init__(self, conn):
@@ -26,24 +24,27 @@ class client:
                     self.unready = False
                 else:
                     try:
-                        datalist = [json.loads(str(data, 'utf-8'))[0], [str(self.__crypto["client"][1].decrypt(b64decode(i[1])), 'utf-8') if i[0] == "str" else struct.unpack('i' if i[0] == 'int' else 'f', self.__crypto["client"][1].decrypt(b64decode(i[1]))) for i in json.loads(str(data, 'utf-8'))[1]]]
+                        decrypted = self.__crypto["client"][1].decrypt(data)
+                        datalist = netstruct.unpack(*netstruct.unpack(b"b$b$", decrypted))
                     except Exception:
                         raise Exception
                     else:
-                        if datalist[0] in self.__ehandler.keys(): self.__ehandler[datalist[0]](*datalist[1])
+                        datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
+                        if datalist[0] in self.__ehandler.keys(): self.__ehandler[datalist[0]](*datalist[1:len(datalist)])
         t = Thread(target=handleincoming)
         t.start()
         while self.unready:
             pass
-    def emit(self, event, *data):
-        encrypteddata = [event, []]
+    def emit(self, *data):
+        types = b""
+        mdata = []
         for i in data:
             dtype = type(i)
             if not dtype in [str, float, int]:
                 raise Exception(f"Emit data type unsupported. {dtype}")
-            bytev = bytearray(i, 'utf-8') if dtype == str else struct('i' if dtype == int else 'f', i)
-            encrypted = [dtype.__name__, b64encode(self.__crypto["server"][1].encrypt(bytev)).decode()]
-            encrypteddata[1].append(encrypted)
-        self.__s.sendall(bytearray(json.dumps(encrypteddata), 'utf-8'))
+            types += b"b$" if dtype == str else b"i" if dtype == int else b"f"
+            mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+        encodeddata = netstruct.pack(b'b$b$', types, netstruct.pack(types, *mdata))
+        self.__s.sendall(self.__crypto["server"][1].encrypt(encodeddata))
     def on(self, event, callback):
         self.__ehandler[event] = callback
