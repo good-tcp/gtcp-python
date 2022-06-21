@@ -1,6 +1,6 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
-VERSION = '0.2.0' 
+VERSION = '0.2.4' 
 DESCRIPTION = 'Simple and secure TCP framework'
 LONG_DESCRIPTION = 'Simple TCP framework with secure event based messaging'
 
@@ -11,7 +11,7 @@ setup(
     author_email="keizouw8@gmail.com",
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
-    packages=find_packages(),
+    packages=["gtcp"],
     install_requires='pycryptodome',
     keywords=['python', 'tcp', 'crypto', 'sockets'],
     classifiers= [

@@ -1,2 +1,2 @@
-from server import server
-from client import client
+from gtcp.server import server
+from gtcp.client import client

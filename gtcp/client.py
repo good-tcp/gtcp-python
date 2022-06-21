@@ -1,7 +1,7 @@
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import socket
-from threading import *
+from threading import Thread
 import json
 from base64 import b64encode, b64decode
 import struct
