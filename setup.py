@@ -1,8 +1,10 @@
 from setuptools import setup
+from pathlib import Path
 
-VERSION = '0.2.4' 
+VERSION = '0.2.5' 
 DESCRIPTION = 'Simple and secure TCP framework'
-LONG_DESCRIPTION = 'Simple TCP framework with secure event based messaging'
+THIS_DIRECTORY = Path(__file__).parent
+LONG_DESCRIPTION = (THIS_DIRECTORY / "README.md").read_text()
 
 setup(
     name="gtcp", 
@@ -11,6 +13,7 @@ setup(
     author_email="keizouw8@gmail.com",
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
+    long_description_content_type='text/markdown',
     packages=["gtcp"],
     install_requires='pycryptodome',
     keywords=['python', 'tcp', 'crypto', 'sockets'],
