@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.0.1' 
+VERSION = '0.2.0' 
 DESCRIPTION = 'Simple and secure TCP framework'
 LONG_DESCRIPTION = 'Simple TCP framework with secure event based messaging'
 
@@ -12,10 +12,10 @@ setup(
     description=DESCRIPTION,
     long_description=LONG_DESCRIPTION,
     packages=find_packages(),
-    install_requires=[],
+    install_requires='pycryptodome',
     keywords=['python', 'tcp', 'crypto', 'sockets'],
     classifiers= [
-        "Development Status :: 1 - Planning",
+        "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
