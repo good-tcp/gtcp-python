@@ -41,7 +41,7 @@ class client:
         for i in data:
             dtype = type(i)
             if not dtype in [str, float, int]:
-                raise Exception(f"Emit data type unsupported. {dtype}")
+                raise Exception(f"Emit data type unsupported: {dtype}")
             types += b"b$" if dtype == str else b"i" if dtype == int else b"f"
             mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
         encodeddata = netstruct.pack(b'b$b$', types, netstruct.pack(types, *mdata))
