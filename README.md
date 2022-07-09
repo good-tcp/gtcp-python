@@ -17,15 +17,16 @@ from gtcp import server, client
 ```
 ## Documentation
 - [Server](#server)
-    - [Initialization](#initialization)
-    - [Handling connections](#handling-connections)
-    - [Sending Data](#sending-data)
-    - [Recieving data](#recieving-data)
-    - [Rooms](#rooms)
+  - [Initialization](#initialization)
+  - [Handling connections](#handling-connections)
+  - [Sending data](#sending-data)
+  - [Recieving data](#recieving-data)
+  - [Rooms](#rooms)
+  - [Handling client disconnect](#handling-client-disconnect)
 - [Client](#client)
-    - [Initialization](#initialization-1)
-    - [Sending Data](#sending-data-1)
-    - [Recieving data](#recieving-data-1)
+  - [Initialization](#initialization-1)
+  - [Sending data](#sending-data-1)
+  - [Recieving data](#recieving-data-1)
 
 ## Server
 ### Initialization
@@ -129,31 +130,54 @@ socket.to("room1").emit("hello", "world")
 socket.to("room1").to("room2").emit("hello", "world")
 ```
 
+### Handling client disconnect
+To a socket disconnect, listen with the ```.on()``` method for a the "end" event. The callback function takes no parameters
+```python
+def connectionhandler(socket):
+    def endhandler():
+        pass
+    socket.on("end", endhandler)
+s.connect(connectionhandler)
+```
+
 ## Client
 ### Initialization
-The client comes as a class. When creating a client with the class, the constructor takes 1 parameter: the IP address and port of the server to connect to.
+The client comes as a class. When creating a client with the class, the constructor takes 2 parameters: the IP address and port of the server to connect to and, optionally, a callback function to run when the client connects to the server.
 ```python
 from gtcp import client
 
+# 'connectionhandler,' which is optional, is ran when it 'c' finishes connecting to the server
+def connectionhandler(c):
+    pass
+
 # 'c' is a TCP client connected to a server ran on port 8080 
-c = client("localhost:8080")
+c = client("localhost:8080", connectionhandler) # 'connectionhandler' can be omitted as a parameter
 ```
 
 ### Sending data
 To send data to the server, use the ```.emit()``` method. It takes at least two parameters: the event and any amount of data to be sent.
 ```python
-c = client("localhost:8080")
+def connectionhandler(c):
+    # This will send to the server
+    c.emit("login", username, password, email)
 
-# This will send to the server
+c = client("localhost:8080", connectionhandler)
+
+# This also sends to the server
 c.emit("login", username, password, email)
 ```
 
 ### Recieving data
 To recieve data from the server, use the client object's ```.on()``` method. It takes two parameters: the event and a callback function with parameters for all the data.
 ```python
-c = client("localhost:8080")
-
 def loginhandler(username, password, email):
     pass
+
+def connectionhandler(c):
+    c.on("login", loginhandler)
+
+c = client("localhost:8080")
+
+# This also works
 c.on("login", loginhandler)
 ```

@@ -1,7 +1,7 @@
 from setuptools import setup
 from pathlib import Path
 
-VERSION = '0.2.6' 
+VERSION = '0.2.9'
 DESCRIPTION = 'Simple and secure TCP framework'
 THIS_DIRECTORY = Path(__file__).parent
 LONG_DESCRIPTION = (THIS_DIRECTORY / "README.md").read_text()
@@ -15,7 +15,7 @@ setup(
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
     packages=["gtcp"],
-    install_requires=['pycryptodome', 'netstruct'],
+    install_requires='pycryptodome',
     keywords=['python', 'tcp', 'crypto', 'sockets'],
     classifiers= [
         "Development Status :: 3 - Alpha",
