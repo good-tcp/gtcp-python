@@ -147,21 +147,21 @@ The client comes as a class. When creating a client with the class, the construc
 from gtcp import client
 
 # 'connectionhandler,' which is optional, is ran when it 'c' finishes connecting to the server
-def connectionhandler(c):
+def clientcallback(c):
     pass
 
 # 'c' is a TCP client connected to a server ran on port 8080 
-c = client("localhost:8080", connectionhandler) # 'connectionhandler' can be omitted as a parameter
+c = client("localhost:8080", clientcallback) # 'connectionhandler' can be omitted as a parameter
 ```
 
 ### Sending data
 To send data to the server, use the ```.emit()``` method. It takes at least two parameters: the event and any amount of data to be sent.
 ```python
-def connectionhandler(c):
+def clientcallback(c):
     # This will send to the server
     c.emit("login", username, password, email)
 
-c = client("localhost:8080", connectionhandler)
+c = client("localhost:8080", clientcallback)
 
 # This also sends to the server
 c.emit("login", username, password, email)
@@ -173,10 +173,10 @@ To recieve data from the server, use the client object's ```.on()``` method. It 
 def loginhandler(username, password, email):
     pass
 
-def connectionhandler(c):
+def clientcallback(c):
     c.on("login", loginhandler)
 
-c = client("localhost:8080")
+c = client("localhost:8080", clientcallback)
 
 # This also works
 c.on("login", loginhandler)

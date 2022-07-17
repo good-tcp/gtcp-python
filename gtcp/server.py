@@ -75,25 +75,24 @@ class server:
                     self.__sockets[socketid] = {"clientconn": (connection, client_address), "crypto": {"server": (key, encryptor), "client": 0}, "rooms": [socketid]}
                     vsocket = vsock((connection, client_address), socketid, {"server": (key, encryptor)})
                     connection.sendall(key.publickey().exportKey(format='PEM', passphrase=None, pkcs=1))
+                    data = connection.recv(1024)
+                    clientkey = RSA.importKey(data, passphrase=None)
+                    clientencryptor = PKCS1_OAEP.new(clientkey)
+                    self.__sockets[socketid]["crypto"]["client"] = (clientkey, clientencryptor)
+                    vsocket._vsock__crypto["client"] = (clientkey, clientencryptor)
+                    callback(vsocket)
                     while True:
                         data = connection.recv(1024)
-                        if not self.__sockets[socketid]["crypto"]["client"]:
-                            clientkey = RSA.importKey(data, passphrase=None)
-                            clientencryptor = PKCS1_OAEP.new(clientkey)
-                            self.__sockets[socketid]["crypto"]["client"] = (clientkey, clientencryptor)
-                            vsocket._vsock__crypto["client"] = (clientkey, clientencryptor)
-                            callback(vsocket)
+                        try:
+                            decrypted = self.__sockets[socketid]["crypto"]["server"][1].decrypt(data)
+                            datalist = struct.unpack(*struct.unpack("%ds%ss"%struct.unpack('ii', decrypted[:8]), decrypted[8:]))
+                        except Exception:
+                            del self.__sockets[socketid]
+                            if "end" in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler["end"]()
+                            break
                         else:
-                            try:
-                                decrypted = self.__sockets[socketid]["crypto"]["server"][1].decrypt(data)
-                                datalist = struct.unpack(*struct.unpack("%ds%ss"%struct.unpack('ii', decrypted[:8]), decrypted[8:]))
-                            except Exception:
-                                del self.__sockets[socketid]
-                                if "end" in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler["end"]()
-                                break
-                            else:
-                                datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
-                                if datalist[0] in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
+                            datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
+                            if datalist[0] in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
                 t1 = Thread(target=conngetdata)
                 t1.start()
         t = Thread(target=startcon)
