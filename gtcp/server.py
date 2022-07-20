@@ -9,15 +9,26 @@ class partialserver:
     def __init__(self, base,includesockets=[]):
         self.__sockets = {i: base._server__sockets[i] for i in base._server__sockets}
         self.__include = [includesockets]
+        self.__callbacks = base._server__callbacks
     def emit(self, *data):
         types = ""
         mdata = []
         for i in data:
             dtype = type(i)
-            if not dtype in [str, float, int]:
+            if not dtype in [str, float, int, type(lambda: None)]:
                 raise Exception(f"Emit data type unsupported: {dtype}")
-            types += f"{len(i)}s" if dtype == str else "i" if dtype == int else "f"
-            mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+            if dtype == type(lambda: None):
+                types += "51s"
+                cbid = str(uuid4())
+                for socket in [i for i in self.__sockets if any([u in self.__include for u in self.__sockets[i]["rooms"]])]:
+                    self.__callbacks[f"{socket}:@gtcp:callback:{cbid}"] = i
+                mdata.append(bytearray(f'@gtcp:callback:{cbid}', 'utf-8'))
+            elif dtype == str:
+                types += f"{len(i)}s"
+                mdata.append(bytearray(i, 'utf-8'))
+            else:
+                types += "i" if dtype == int else "f"
+                mdata.append(i)
         packeddata = struct.pack(types, *mdata)
         encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in [i for i in self.__sockets if any([u in self.__include for u in self.__sockets[i]["rooms"]])]:
@@ -32,6 +43,7 @@ class server:
         self.__s.bind(('127.0.0.1', port))
         self.__s.listen(1)
         self.__sockets = {}
+        self.__callbacks = {}
     def connection(self, callback):
         vsockref = self
         class vsock:
@@ -47,10 +59,19 @@ class server:
                 mdata = []
                 for i in data:
                     dtype = type(i)
-                    if not dtype in [str, float, int]:
+                    if not dtype in [str, float, int, type(lambda: None)]:
                         raise Exception(f"Emit data type unsupported: {dtype}")
-                    types += f"{len(i)}s" if dtype == str else "i" if dtype == int else "f"
-                    mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+                    if dtype == type(lambda: None):
+                        types += "51s"
+                        cbid = str(uuid4())
+                        vsockref._server__callbacks[f"{self.id}:@gtcp:callback:{cbid}"] = i
+                        mdata.append(bytearray(f'@gtcp:callback:{cbid}', 'utf-8'))
+                    elif dtype == str:
+                        types += f"{len(i)}s"
+                        mdata.append(bytearray(i, 'utf-8'))
+                    else:
+                        types += "i" if dtype == int else "f"
+                        mdata.append(i)
                 packeddata = struct.pack(types, *mdata)
                 encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
                 self.__conn[0].sendall(self.__crypto["client"][1].encrypt(encodeddata))
@@ -72,9 +93,9 @@ class server:
                     key = RSA.generate(2048)
                     encryptor = PKCS1_OAEP.new(key)
                     socketid = str(uuid4())
-                    self.__sockets[socketid] = {"clientconn": (connection, client_address), "crypto": {"server": (key, encryptor), "client": 0}, "rooms": [socketid]}
+                    self.__sockets[socketid] = {"clientconn": (connection, client_address), "crypto": {"server": (key, encryptor), "client": 0}, "rooms": [socketid], "callbacks": {}}
                     vsocket = vsock((connection, client_address), socketid, {"server": (key, encryptor)})
-                    connection.sendall(key.publickey().exportKey(format='PEM', passphrase=None, pkcs=1))
+                    connection.sendall(bytearray(socketid, 'utf-8') + key.publickey().exportKey(format='PEM', passphrase=None, pkcs=1))
                     data = connection.recv(1024)
                     clientkey = RSA.importKey(data, passphrase=None)
                     clientencryptor = PKCS1_OAEP.new(clientkey)
@@ -92,7 +113,18 @@ class server:
                             break
                         else:
                             datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
-                            if datalist[0] in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
+                            if datalist[0][37:52] == "@gtcp:callback:":
+                                self.__callbacks[datalist[0]](*datalist[1:])
+                                del self.__callbacks[datalist[0]]
+                            elif datalist[0] in vsocket._vsock__ehandler.keys():
+                                for i in range(len(datalist)):
+                                    if type(datalist[i]) == str:
+                                        if datalist[i][:15] == "@gtcp:callback:":
+                                            cbeid = datalist[i]
+                                            def vcallback(*args):
+                                                self.emit(cbeid, *args)
+                                            datalist[i] = vcallback
+                                vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
                 t1 = Thread(target=conngetdata)
                 t1.start()
         t = Thread(target=startcon)
@@ -102,10 +134,20 @@ class server:
         mdata = []
         for i in data:
             dtype = type(i)
-            if not dtype in [str, float, int]:
+            if not dtype in [str, float, int, type(lambda: None)]:
                 raise Exception(f"Emit data type unsupported: {dtype}")
-            types += f"{len(i)}s" if dtype == str else "i" if dtype == int else "f"
-            mdata.append(bytearray(i, 'utf-8') if dtype == str else i)
+            if dtype == type(lambda: None):
+                types += "51s"
+                cbid = str(uuid4())
+                for socket in self.__sockets:
+                    self.__callbacks[f"{socket}:@gtcp:callback:{cbid}"] = i
+                mdata.append(bytearray(f'@gtcp:callback:{cbid}', 'utf-8'))
+            elif dtype == str:
+                types += f"{len(i)}s"
+                mdata.append(bytearray(i, 'utf-8'))
+            else:
+                types += "i" if dtype == int else "f"
+                mdata.append(i)
         packeddata = struct.pack(types, *mdata)
         encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in self.__sockets:
