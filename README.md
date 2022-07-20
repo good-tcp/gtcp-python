@@ -27,6 +27,7 @@ from gtcp import server, client
   - [Initialization](#initialization-1)
   - [Sending data](#sending-data-1)
   - [Recieving data](#recieving-data-1)
+- [Callbacks](#callbacks)
 
 ## Server
 ### Initialization
@@ -65,20 +66,20 @@ You can use the ```.emit()``` method with a server object or a socket object to 
 ```python
 def connectionhandler(socket):
     # This will send to the specific socket from the parameter
-    socket.emit("login", username, password, email)
+    socket.emit("login", username, password)
     # This will send to all sockets
-    s.emit("login", username, password, email)
+    s.emit("login", username, password)
 s.connect(connectionhandler)
 
 # This will send to all sockets
-s.emit("login", username, password, email)
+s.emit("login", username, password)
 ```
 
 ### Recieving data
 To recieve data from a socket, use it's ```.on()``` method. It takes two parameters: the event and a callback function with parameters for all the data.
 ```python
 def connectionhandler(socket):
-    def loginhandler(username, password, email):
+    def loginhandler(username, password):
         pass
     socket.on("login", loginhandler)
 s.connect(connectionhandler)
@@ -159,18 +160,18 @@ To send data to the server, use the ```.emit()``` method. It takes at least two 
 ```python
 def clientcallback(c):
     # This will send to the server
-    c.emit("login", username, password, email)
+    c.emit("login", username, password)
 
 c = client("localhost:8080", clientcallback)
 
 # This also sends to the server
-c.emit("login", username, password, email)
+c.emit("login", username, password)
 ```
 
 ### Recieving data
 To recieve data from the server, use the client object's ```.on()``` method. It takes two parameters: the event and a callback function with parameters for all the data.
 ```python
-def loginhandler(username, password, email):
+def loginhandler(username, password):
     pass
 
 def clientcallback(c):
@@ -180,4 +181,31 @@ c = client("localhost:8080", clientcallback)
 
 # This also works
 c.on("login", loginhandler)
+```
+
+## Callbacks
+Sometimes, it is useful to have a more traditional request-response style API. In GTCP, this is achieved with callback functions.
+
+Callback functions are any functions that are sent through an ```.emit()```. The function will be ran and supplied with parameters when it is called by the other side.
+```python
+# In client
+def clientcallback(c):
+    def loginCallback(confirm, userToken=""):
+        if confirm:
+            print(userToken)
+    c.emit("login", username, password, loginCallback)
+c = client("localhost:8080", clientcallback)
+
+# In server
+def connectionhandler(socket):
+    def loginhandler(username, password, callback):
+        if db.exists("username", username):
+            if db.where("username", username)["password"] == password:
+                callback(1, db.where("username", username)["userToken"])
+            else:
+                callback(0)
+        else:
+            callback(0)
+    socket.on("login", loginhandler)
+s.connect(connectionhandler)
 ```
