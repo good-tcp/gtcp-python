@@ -33,10 +33,12 @@ class client:
                     raise Exception
                 else:
                     datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
-                    if datalist[0][:15] == "@gtcp:callback:":
-                        self.__callbacks[datalist[0][15:]](*datalist[1:])
-                        del self.__callbacks[datalist[0][15:]]
-                    elif datalist[0] in self.__ehandler.keys():
+                    if type(datalist[0]) == str:
+                        if datalist[0][:15] == "@gtcp:callback:":
+                            self.__callbacks[datalist[0][15:]](*datalist[1:])
+                            del self.__callbacks[datalist[0][15:]]
+                            continue
+                    if datalist[0] in self.__ehandler.keys():
                         for i in range(len(datalist)):
                             if type(datalist[i]) == str:
                                 if datalist[i][:15] == "@gtcp:callback:":
