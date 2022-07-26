@@ -40,11 +40,11 @@ class partialserver:
 class server:
     def __init__(self, port):
         self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__s.bind(('127.0.0.1', port))
+        self.__s.bind(("", port))
         self.__s.listen(1)
         self.__sockets = {}
         self.__callbacks = {}
-    def connection(self, callback):
+        self.__conn_callback = None
         vsockref = self
         class vsock:
             def __init__(self, connection, id, crypto):
@@ -101,7 +101,8 @@ class server:
                     clientencryptor = PKCS1_OAEP.new(clientkey)
                     self.__sockets[socketid]["crypto"]["client"] = (clientkey, clientencryptor)
                     vsocket._vsock__crypto["client"] = (clientkey, clientencryptor)
-                    callback(vsocket)
+                    if self.__conn_callback:
+                        self.__conn_callback(vsocket)
                     while True:
                         data = connection.recv(1024)
                         try:
@@ -129,6 +130,8 @@ class server:
                 t1.start()
         t = Thread(target=startcon)
         t.start()
+    def connection(self, callback):
+        self.__conn_callback = callback
     def emit(self, *data):
         types = ""
         mdata = []
