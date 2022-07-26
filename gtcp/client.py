@@ -8,6 +8,8 @@ from uuid import uuid4
 class client:
     def __init__(self, conn, *callback):
         self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self.__s.connect(tuple(conn.split(":")[i] if i == 0 else int(conn.split(":")[i]) for i in range(2)))
         key = RSA.generate(2048)
         encryptor = PKCS1_OAEP.new(key)
@@ -34,7 +36,7 @@ class client:
                 else:
                     datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
                     if type(datalist[0]) == str:
-                        if datalist[0][:15] == "@gtcp:callback:":
+                        if datalist[0][15:] in self.__callbacks.keys():
                             self.__callbacks[datalist[0][15:]](*datalist[1:])
                             del self.__callbacks[datalist[0][15:]]
                             continue

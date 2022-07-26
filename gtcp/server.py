@@ -40,6 +40,8 @@ class partialserver:
 class server:
     def __init__(self, port):
         self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self.__s.bind(("", port))
         self.__s.listen(1)
         self.__sockets = {}
@@ -114,7 +116,7 @@ class server:
                             break
                         else:
                             datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
-                            if datalist[0][37:52] == "@gtcp:callback:":
+                            if datalist[0] in self.__callbacks.keys():
                                 self.__callbacks[datalist[0]](*datalist[1:])
                                 del self.__callbacks[datalist[0]]
                             elif datalist[0] in vsocket._vsock__ehandler.keys():
