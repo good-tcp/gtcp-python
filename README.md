@@ -31,12 +31,19 @@ from gtcp import server, client
 
 ## Server
 ### Initialization
-The server comes as a class. When creating a server with the class, the constructor takes 1 parameter: the port the server will run on.
+The server comes as a class. When creating a server with the class, the constructor takes 1 required parameter: the port the server will run on.
 ```python
 from gtcp import server
 
 # 's' is a TCP server that runs on port 8080
 s = server(8080)
+```
+ Additionally, the server also takes 1 optional parameter: options. Options should be passed as a dictionary.
+```python
+from gtcp import server
+
+# in this case, we are setting the "encrypted" option to true
+s = server(8080, {"encrypted": True})
 ```
 
 ### Handling connections
@@ -143,7 +150,14 @@ s.connect(connectionhandler)
 
 ## Client
 ### Initialization
-The client comes as a class. When creating a client with the class, the constructor takes 2 parameters: the IP address and port of the server to connect to and, optionally, a callback function to run when the client connects to the server.
+The client comes as a class. When creating a client with the class, the constructor takes 1 required parameters: the IP address and port of the server to connect to.
+```python
+from gtcp import client
+
+# 'c' is a TCP client connected to a server ran on port 8080 
+c = client("localhost:8080")
+```
+Additionally it takes 2 more optional parameters: a callback function to run when the client connects to the server and an options dictionary.
 ```python
 from gtcp import client
 
@@ -151,8 +165,8 @@ from gtcp import client
 def clientcallback(c):
     pass
 
-# 'c' is a TCP client connected to a server ran on port 8080 
-c = client("localhost:8080", clientcallback) # 'connectionhandler' can be omitted as a parameter
+# 'c' is an encrypted TCP client connected to a server ran on port 8080
+c = client("localhost:8080", {"encrypted": True}, clientcallback)
 ```
 
 ### Sending data
