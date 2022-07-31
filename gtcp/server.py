@@ -6,10 +6,11 @@ import socket
 import struct
 
 class partialserver:
-    def __init__(self, base,includesockets=[]):
+    def __init__(self, base, includesockets=[]):
         self.__sockets = {i: base._server__sockets[i] for i in base._server__sockets}
         self.__include = [includesockets]
         self.__callbacks = base._server__callbacks
+        self.__encryption = base._server__encryption
     def emit(self, *data):
         types = ""
         mdata = []
@@ -32,13 +33,17 @@ class partialserver:
         packeddata = struct.pack(types, *mdata)
         encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in [i for i in self.__sockets if any([u in self.__include for u in self.__sockets[i]["rooms"]])]:
-            self.__sockets[socket]["clientconn"][0].sendall(self.__sockets[socket]["crypto"]["client"][1].encrypt(encodeddata))
+            print(1)
+            data = b"" + encodeddata
+            if self.__sockets[socket]["crypto"]:
+                data = self.__sockets[socket]["crypto"][1].encrypt(encodeddata)
+            self.__sockets[socket]["clientconn"][0].sendall(data)
     def to(self, room):
         self.__include.append(room)
         return self
 
 class server:
-    def __init__(self, port):
+    def __init__(self, port, *params):
         self.__s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
@@ -47,6 +52,15 @@ class server:
         self.__sockets = {}
         self.__callbacks = {}
         self.__conn_callback = None
+        self.__encryption = None
+        options = [x for i,x in enumerate(params) if type(x) == dict]
+        if len(options) > 0:
+            options = options[0]
+            if "encrypted" in options.keys():
+                if options["encrypted"]:
+                    key = RSA.generate(2048)
+                    encryptor = PKCS1_OAEP.new(key)
+                    self.__encryption = (key, encryptor)
         vsockref = self
         class vsock:
             def __init__(self, connection, id, crypto):
@@ -76,7 +90,10 @@ class server:
                         mdata.append(i)
                 packeddata = struct.pack(types, *mdata)
                 encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
-                self.__conn[0].sendall(self.__crypto["client"][1].encrypt(encodeddata))
+                print(2)
+                if self.__crypto:
+                    encodeddata = self.__crypto[1].encrypt(encodeddata)
+                self.__conn[0].sendall(encodeddata)
             def on(self, event, callback):
                 self.__ehandler[event] = callback
             def join(self, room):
@@ -92,24 +109,24 @@ class server:
             while True:
                 connection, client_address = self.__s.accept()
                 def conngetdata():
-                    key = RSA.generate(2048)
-                    encryptor = PKCS1_OAEP.new(key)
                     socketid = str(uuid4())
-                    self.__sockets[socketid] = {"clientconn": (connection, client_address), "crypto": {"server": (key, encryptor), "client": 0}, "rooms": [socketid], "callbacks": {}}
-                    vsocket = vsock((connection, client_address), socketid, {"server": (key, encryptor)})
-                    connection.sendall(bytearray(socketid, 'utf-8') + key.publickey().exportKey(format='PEM', passphrase=None, pkcs=1))
+                    self.__sockets[socketid] = {"clientconn": (connection, client_address), "crypto": None, "rooms": [socketid], "callbacks": {}}
+                    connection.sendall(bytearray(socketid, 'utf-8') + (self.__encryption[0].publickey().exportKey(format='PEM', passphrase=None, pkcs=1) if self.__encryption else b''))
                     data = connection.recv(1024)
-                    clientkey = RSA.importKey(data, passphrase=None)
-                    clientencryptor = PKCS1_OAEP.new(clientkey)
-                    self.__sockets[socketid]["crypto"]["client"] = (clientkey, clientencryptor)
-                    vsocket._vsock__crypto["client"] = (clientkey, clientencryptor)
+                    if len(data) != 1:
+                        clientkey = RSA.importKey(data, passphrase=None)
+                        clientencryptor = PKCS1_OAEP.new(clientkey)
+                        self.__sockets[socketid]["crypto"] = (clientkey, clientencryptor)
+                    vsocket = vsock((connection, client_address), socketid, self.__sockets[socketid]["crypto"])
                     if self.__conn_callback:
                         self.__conn_callback(vsocket)
                     while True:
-                        data = connection.recv(1024)
                         try:
-                            decrypted = self.__sockets[socketid]["crypto"]["server"][1].decrypt(data)
-                            datalist = struct.unpack(*struct.unpack("%ds%ss"%struct.unpack('ii', decrypted[:8]), decrypted[8:]))
+                            data = connection.recv(1024)
+                            if self.__encryption:
+                                data = self.__encryption[1].decrypt(data)
+                            print(data)
+                            datalist = struct.unpack(*struct.unpack("%ds%ss"%struct.unpack('ii', data[:8]), data[8:]))
                         except Exception:
                             del self.__sockets[socketid]
                             if "end" in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler["end"]()
@@ -156,7 +173,11 @@ class server:
         packeddata = struct.pack(types, *mdata)
         encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in self.__sockets:
-            self.__sockets[socket]["clientconn"][0].sendall(self.__sockets[socket]["crypto"]["client"][1].encrypt(encodeddata))
+            print(0)
+            data = b"" + encodeddata
+            if self.__sockets[socket]["crypto"]:
+                data = self.__sockets[socket]["crypto"][1].encrypt(encodeddata)
+            self.__sockets[socket]["clientconn"][0].sendall(data)
     def to(self, room):
         modifieds = partialserver(self, includesockets=room)
         return modifieds
