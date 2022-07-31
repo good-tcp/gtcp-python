@@ -1,7 +1,7 @@
 from setuptools import setup
 from pathlib import Path
 
-VERSION = '0.3.1'
+VERSION = '0.3.2'
 DESCRIPTION = 'Simple and secure TCP framework'
 THIS_DIRECTORY = Path(__file__).parent
 LONG_DESCRIPTION = (THIS_DIRECTORY / "README.md").read_text()
