@@ -33,7 +33,6 @@ class partialserver:
         packeddata = struct.pack(types, *mdata)
         encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in [i for i in self.__sockets if any([u in self.__include for u in self.__sockets[i]["rooms"]])]:
-            print(1)
             data = b"" + encodeddata
             if self.__sockets[socket]["crypto"]:
                 data = self.__sockets[socket]["crypto"][1].encrypt(encodeddata)
@@ -90,7 +89,6 @@ class server:
                         mdata.append(i)
                 packeddata = struct.pack(types, *mdata)
                 encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
-                print(2)
                 if self.__crypto:
                     encodeddata = self.__crypto[1].encrypt(encodeddata)
                 self.__conn[0].sendall(encodeddata)
@@ -125,7 +123,6 @@ class server:
                             data = connection.recv(1024)
                             if self.__encryption:
                                 data = self.__encryption[1].decrypt(data)
-                            print(data)
                             datalist = struct.unpack(*struct.unpack("%ds%ss"%struct.unpack('ii', data[:8]), data[8:]))
                         except Exception:
                             del self.__sockets[socketid]
@@ -173,7 +170,6 @@ class server:
         packeddata = struct.pack(types, *mdata)
         encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in self.__sockets:
-            print(0)
             data = b"" + encodeddata
             if self.__sockets[socket]["crypto"]:
                 data = self.__sockets[socket]["crypto"][1].encrypt(encodeddata)
