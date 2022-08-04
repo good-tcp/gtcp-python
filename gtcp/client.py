@@ -36,13 +36,11 @@ class client:
                 callback[0](self)
             while True:
                 def handleData(data):
-                    if self.__crypto["client"]:
-                        data = self.__crypto["client"][1].decrypt(data)
                     lengths = struct.unpack('ii', data[:8])
-                    if sum(lengths) < len(data[8:]):
-                        handleData(data[8+sum(lengths):])
-                        data = data[:8+sum(lengths)]
-                    datalist = struct.unpack(*struct.unpack("%ds%ss"%lengths, data[8:]))
+                    datalist = list(struct.unpack("%ds%ss"%lengths, data[8:8+sum(lengths)]))
+                    if self.__crypto["client"]:
+                        datalist[1] = self.__crypto["client"][1].decrypt(datalist[1])
+                    datalist = struct.unpack(*datalist)
                     datalist = [str(i, 'utf-8') if type(i) == bytes else i for i in datalist]
                     if type(datalist[0]) == str:
                         if datalist[0][15:] in self.__callbacks.keys():
@@ -58,6 +56,7 @@ class client:
                                         self.emit(cbeid, *args)
                                     datalist[i] = vcallback
                         self.__ehandler[datalist[0]](*datalist[1:len(datalist)])
+                    if sum(lengths) < len(data[8:]): handleData(data[8+sum(lengths):])
                 try:
                     data = self.__s.recv(1024)
                     handleData(data)
@@ -86,9 +85,8 @@ class client:
                 types += "i" if dtype == int else "f"
                 mdata.append(i)
         packeddata = struct.pack(types, *mdata)
-        encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         if self.__crypto["server"]:
-            encodeddata = self.__crypto["server"][1].encrypt(encodeddata)
-        self.__s.sendall(encodeddata)
+            packeddata = self.__crypto["server"][1].encrypt(packeddata)
+        self.__s.sendall(struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata))
     def on(self, event, callback):
         self.__ehandler[event] = callback

@@ -31,11 +31,11 @@ class partialserver:
                 types += "i" if dtype == int else "f"
                 mdata.append(i)
         packeddata = struct.pack(types, *mdata)
-        encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in [i for i in self.__sockets if any([u in self.__include for u in self.__sockets[i]["rooms"]])]:
-            data = b"" + encodeddata
+            pdata = b"" + packeddata
             if self.__sockets[socket]["crypto"]:
-                data = self.__sockets[socket]["crypto"][1].encrypt(encodeddata)
+                pdata = self.__sockets[socket]["crypto"][1].encrypt(pdata)
+            data = struct.pack(f'ii{len(types)}s{len(pdata)}s', len(types), len(pdata), bytearray(types, 'utf-8'), pdata)
             self.__sockets[socket]["clientconn"][0].sendall(data)
     def to(self, room):
         self.__include.append(room)
@@ -88,9 +88,9 @@ class server:
                         types += "i" if dtype == int else "f"
                         mdata.append(i)
                 packeddata = struct.pack(types, *mdata)
-                encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
                 if self.__crypto:
-                    encodeddata = self.__crypto[1].encrypt(encodeddata)
+                    packeddata = self.__crypto[1].encrypt(packeddata)
+                encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
                 self.__conn[0].sendall(encodeddata)
             def on(self, event, callback):
                 self.__ehandler[event] = callback
@@ -121,9 +121,11 @@ class server:
                     while True:
                         try:
                             data = connection.recv(1024)
+                            lengths = struct.unpack('ii', data[:8])
+                            datalist = list(struct.unpack("%ds%ss"%lengths, data[8:8+sum(lengths)]))
                             if self.__encryption:
-                                data = self.__encryption[1].decrypt(data)
-                            datalist = struct.unpack(*struct.unpack("%ds%ss"%struct.unpack('ii', data[:8]), data[8:]))
+                                datalist[1] = self.__encryption[1].decrypt(datalist[1])
+                            datalist = struct.unpack(*datalist)
                         except Exception:
                             del self.__sockets[socketid]
                             if "end" in vsocket._vsock__ehandler.keys(): vsocket._vsock__ehandler["end"]()
@@ -168,11 +170,11 @@ class server:
                 types += "i" if dtype == int else "f"
                 mdata.append(i)
         packeddata = struct.pack(types, *mdata)
-        encodeddata = struct.pack(f'ii{len(types)}s{len(packeddata)}s', len(types), len(packeddata), bytearray(types, 'utf-8'), packeddata)
         for socket in self.__sockets:
-            data = b"" + encodeddata
+            pdata = b"" + packeddata
             if self.__sockets[socket]["crypto"]:
-                data = self.__sockets[socket]["crypto"][1].encrypt(encodeddata)
+                pdata = self.__sockets[socket]["crypto"][1].encrypt(pdata)
+            data = struct.pack(f'ii{len(types)}s{len(pdata)}s', len(types), len(pdata), bytearray(types, 'utf-8'), pdata)
             self.__sockets[socket]["clientconn"][0].sendall(data)
     def to(self, room):
         modifieds = partialserver(self, includesockets=room)
