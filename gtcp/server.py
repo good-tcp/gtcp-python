@@ -139,10 +139,11 @@ class server:
                                 for i in range(len(datalist)):
                                     if type(datalist[i]) == str:
                                         if datalist[i][:15] == "@gtcp:callback:":
-                                            cbeid = datalist[i]
-                                            def vcallback(*args):
-                                                self.emit(cbeid, *args)
-                                            datalist[i] = vcallback
+                                            def gencallback(cbeid):
+                                                def vcallback(*args):
+                                                    self.emit(cbeid, *args)
+                                                return vcallback
+                                            datalist[i] = gencallback(datalist[i])
                                 vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
                 t1 = Thread(target=conngetdata)
                 t1.start()
