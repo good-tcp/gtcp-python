@@ -141,7 +141,7 @@ class server:
                                         if datalist[i][:15] == "@gtcp:callback:":
                                             def gencallback(cbeid):
                                                 def vcallback(*args):
-                                                    self.emit(cbeid, *args)
+                                                    self.to(socketid).emit(cbeid, *args)
                                                 return vcallback
                                             datalist[i] = gencallback(datalist[i])
                                 vsocket._vsock__ehandler[datalist[0]](*datalist[1:len(datalist)])
